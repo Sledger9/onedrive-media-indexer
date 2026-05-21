@@ -3,7 +3,7 @@ import GoogleProvider from 'next-auth/providers/google';
 import GithubProvider from 'next-auth/providers/github';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
-import { db } from '@/lib/db';
+import { db, ensureDbInitialized } from '@/lib/db';
 
 const providers: any[] = [
   CredentialsProvider({
@@ -16,6 +16,8 @@ const providers: any[] = [
       if (!credentials?.username || !credentials?.password) {
         throw new Error('Please enter your username and password.');
       }
+
+      await ensureDbInitialized();
 
       const result = await db.execute({
         sql: 'SELECT * FROM users WHERE username = ?',
