@@ -30,8 +30,8 @@ async function main() {
     process.exit(1);
   }
 
-  const dbUrl = process.env.TURSO_DATABASE_URL || 'file:local.db';
-  const dbAuthToken = process.env.TURSO_AUTH_TOKEN || '';
+  const dbUrl = process.env.TURSO_DATABASE_URL || process.env.DATABASE_URL || 'file:local.db';
+  const dbAuthToken = process.env.TURSO_AUTH_TOKEN || process.env.DATABASE_AUTH_TOKEN || '';
 
   console.log(`\nConnecting to database: ${dbUrl}`);
 

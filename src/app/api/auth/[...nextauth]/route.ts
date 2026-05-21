@@ -13,57 +13,75 @@ const providers: any[] = [
       password: { label: "Password", type: "password" }
     },
     async authorize(credentials) {
+      console.log('[AUTH] Authorize called for username:', credentials?.username);
+      
       if (!credentials?.username || !credentials?.password) {
+        console.log('[AUTH] Missing credentials');
         throw new Error('Please enter your username and password.');
       }
 
-      await ensureDbInitialized();
+      try {
+        console.log('[AUTH] Awaiting ensureDbInitialized');
+        await ensureDbInitialized();
+        console.log('[AUTH] DB Initialized. Querying user...');
 
-      const result = await db.execute({
-        sql: 'SELECT * FROM users WHERE username = ?',
-        args: [credentials.username],
-      });
+        const result = await db.execute({
+          sql: 'SELECT * FROM users WHERE username = ?',
+          args: [credentials.username],
+        });
 
-      const user = result.rows[0];
+        const user = result.rows[0];
+        console.log('[AUTH] User query result:', user ? 'FOUND' : 'NOT FOUND');
 
-      if (!user) {
-        throw new Error('Invalid username or password.');
-      }
-
-      // Brute-force protection check
-      if (user.locked_until && new Date(user.locked_until as string) > new Date()) {
-        throw new Error('Account temporarily locked due to too many failed attempts. Please try again later.');
-      }
-
-      const passwordMatch = await bcrypt.compare(credentials.password, user.password_hash as string);
-
-      if (!passwordMatch) {
-        const failedAttempts = Number(user.failed_attempts || 0) + 1;
-        
-        if (failedAttempts >= 5) {
-          // Lock out for 15 minutes
-          const lockoutTime = new Date(Date.now() + 15 * 60 * 1000).toISOString();
-          await db.execute({
-            sql: 'UPDATE users SET failed_attempts = ?, locked_until = ? WHERE username = ?',
-            args: [failedAttempts, lockoutTime, credentials.username],
-          });
-          throw new Error('Too many failed attempts. Account locked for 15 minutes.');
-        } else {
-          await db.execute({
-            sql: 'UPDATE users SET failed_attempts = ? WHERE username = ?',
-            args: [failedAttempts, credentials.username],
-          });
+        if (!user) {
+          console.log('[AUTH] User not found in database');
           throw new Error('Invalid username or password.');
         }
+
+        // Brute-force protection check
+        if (user.locked_until && new Date(user.locked_until as string) > new Date()) {
+          console.log('[AUTH] Account is locked until:', user.locked_until);
+          throw new Error('Account temporarily locked due to too many failed attempts. Please try again later.');
+        }
+
+        console.log('[AUTH] Comparing passwords...');
+        const passwordMatch = await bcrypt.compare(credentials.password, user.password_hash as string);
+        console.log('[AUTH] Password match:', passwordMatch);
+
+        if (!passwordMatch) {
+          const failedAttempts = Number(user.failed_attempts || 0) + 1;
+          console.log('[AUTH] Incrementing failed attempts to:', failedAttempts);
+          
+          if (failedAttempts >= 5) {
+            // Lock out for 15 minutes
+            const lockoutTime = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+            await db.execute({
+              sql: 'UPDATE users SET failed_attempts = ?, locked_until = ? WHERE username = ?',
+              args: [failedAttempts, lockoutTime, credentials.username],
+            });
+            throw new Error('Too many failed attempts. Account locked for 15 minutes.');
+          } else {
+            await db.execute({
+              sql: 'UPDATE users SET failed_attempts = ? WHERE username = ?',
+              args: [failedAttempts, credentials.username],
+            });
+            throw new Error('Invalid username or password.');
+          }
+        }
+
+        // Success: Reset failed attempts
+        console.log('[AUTH] Login successful, resetting failed attempts');
+        await db.execute({
+          sql: 'UPDATE users SET failed_attempts = 0, locked_until = NULL WHERE username = ?',
+          args: [credentials.username],
+        });
+
+        console.log('[AUTH] Returning user object');
+        return { id: user.username as string, name: user.username as string, email: user.username as string };
+      } catch (err: any) {
+        console.error('[AUTH] Authorize Error:', err.message);
+        throw err;
       }
-
-      // Success: Reset failed attempts
-      await db.execute({
-        sql: 'UPDATE users SET failed_attempts = 0, locked_until = NULL WHERE username = ?',
-        args: [credentials.username],
-      });
-
-      return { id: user.username as string, name: user.username as string, email: user.username as string };
     }
   })
 ];
