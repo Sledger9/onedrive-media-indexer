@@ -102,7 +102,7 @@ if (process.env.GITHUB_ID && process.env.GITHUB_SECRET) {
 
 export const authOptions = {
   providers,
-  secret: process.env.JWT_SECRET || 'fallback-jwt-secret-key',
+  secret: process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'fallback-jwt-secret-key',
   session: {
     strategy: 'jwt' as const,
   },
