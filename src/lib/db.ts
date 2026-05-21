@@ -78,6 +78,14 @@ export async function initDb(): Promise<void> {
 
     // Create unique constraint index
     await db.execute(`CREATE UNIQUE INDEX IF NOT EXISTS idx_user_media ON user_states(user_id, media_id);`);
+
+    // 4. Create System Settings Table
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS system_settings (
+        key TEXT PRIMARY KEY,
+        token_value TEXT NOT NULL
+      );
+    `);
   } catch (error) {
     console.error('[DB] Failed to initialize database tables:', error);
     throw error;

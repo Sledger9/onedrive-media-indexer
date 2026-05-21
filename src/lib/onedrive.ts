@@ -11,7 +11,7 @@ export async function getOneDriveAccessToken(): Promise<string> {
   }
 
   // Retrieve the refresh token from the database
-  const result = await db.execute('SELECT token_value FROM system_settings WHERE key = "onedrive_refresh_token"');
+  const result = await db.execute("SELECT token_value FROM system_settings WHERE key = 'onedrive_refresh_token'");
   if (result.rows.length === 0) {
     throw new Error('No OneDrive refresh token found. Please connect your OneDrive in the dashboard.');
   }
@@ -41,7 +41,7 @@ export async function getOneDriveAccessToken(): Promise<string> {
   // Update the refresh token if a new one was provided
   if (data.refresh_token && data.refresh_token !== refreshToken) {
     await db.execute({
-      sql: 'UPDATE system_settings SET token_value = ? WHERE key = "onedrive_refresh_token"',
+      sql: "UPDATE system_settings SET token_value = ? WHERE key = 'onedrive_refresh_token'",
       args: [data.refresh_token],
     });
   }
