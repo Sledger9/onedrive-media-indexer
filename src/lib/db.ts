@@ -1,7 +1,7 @@
 import { createClient, Client } from '@libsql/client';
 
-const url = process.env.DATABASE_URL || 'file:local.db';
-const authToken = process.env.DATABASE_AUTH_TOKEN;
+const url = process.env.TURSO_DATABASE_URL || process.env.DATABASE_URL || 'file:local.db';
+const authToken = process.env.TURSO_AUTH_TOKEN || process.env.DATABASE_AUTH_TOKEN;
 
 // Initialize the LibSQL Client (supports both SQLite files and Turso cloud)
 export const db: Client = createClient({

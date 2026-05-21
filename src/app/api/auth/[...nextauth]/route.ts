@@ -5,75 +5,83 @@ import CredentialsProvider from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
 import { db } from '@/lib/db';
 
-export const authOptions = {
-  providers: [
-    GoogleProvider({
-      clientId: process.env.GOOGLE_ID || '',
-      clientSecret: process.env.GOOGLE_SECRET || '',
-    }),
-    GithubProvider({
-      clientId: process.env.GITHUB_ID || '',
-      clientSecret: process.env.GITHUB_SECRET || '',
-    }),
-    CredentialsProvider({
-      name: 'Credentials',
-      credentials: {
-        username: { label: "Username", type: "text" },
-        password: { label: "Password", type: "password" }
-      },
-      async authorize(credentials) {
-        if (!credentials?.username || !credentials?.password) {
-          throw new Error('Please enter your username and password.');
-        }
+const providers: any[] = [
+  CredentialsProvider({
+    name: 'Credentials',
+    credentials: {
+      username: { label: "Username", type: "text" },
+      password: { label: "Password", type: "password" }
+    },
+    async authorize(credentials) {
+      if (!credentials?.username || !credentials?.password) {
+        throw new Error('Please enter your username and password.');
+      }
 
-        const result = await db.execute({
-          sql: 'SELECT * FROM users WHERE username = ?',
-          args: [credentials.username],
-        });
+      const result = await db.execute({
+        sql: 'SELECT * FROM users WHERE username = ?',
+        args: [credentials.username],
+      });
 
-        const user = result.rows[0];
+      const user = result.rows[0];
 
-        if (!user) {
+      if (!user) {
+        throw new Error('Invalid username or password.');
+      }
+
+      // Brute-force protection check
+      if (user.locked_until && new Date(user.locked_until as string) > new Date()) {
+        throw new Error('Account temporarily locked due to too many failed attempts. Please try again later.');
+      }
+
+      const passwordMatch = await bcrypt.compare(credentials.password, user.password_hash as string);
+
+      if (!passwordMatch) {
+        const failedAttempts = Number(user.failed_attempts || 0) + 1;
+        
+        if (failedAttempts >= 5) {
+          // Lock out for 15 minutes
+          const lockoutTime = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+          await db.execute({
+            sql: 'UPDATE users SET failed_attempts = ?, locked_until = ? WHERE username = ?',
+            args: [failedAttempts, lockoutTime, credentials.username],
+          });
+          throw new Error('Too many failed attempts. Account locked for 15 minutes.');
+        } else {
+          await db.execute({
+            sql: 'UPDATE users SET failed_attempts = ? WHERE username = ?',
+            args: [failedAttempts, credentials.username],
+          });
           throw new Error('Invalid username or password.');
         }
-
-        // Brute-force protection check
-        if (user.locked_until && new Date(user.locked_until as string) > new Date()) {
-          throw new Error('Account temporarily locked due to too many failed attempts. Please try again later.');
-        }
-
-        const passwordMatch = await bcrypt.compare(credentials.password, user.password_hash as string);
-
-        if (!passwordMatch) {
-          const failedAttempts = Number(user.failed_attempts || 0) + 1;
-          
-          if (failedAttempts >= 5) {
-            // Lock out for 15 minutes
-            const lockoutTime = new Date(Date.now() + 15 * 60 * 1000).toISOString();
-            await db.execute({
-              sql: 'UPDATE users SET failed_attempts = ?, locked_until = ? WHERE username = ?',
-              args: [failedAttempts, lockoutTime, credentials.username],
-            });
-            throw new Error('Too many failed attempts. Account locked for 15 minutes.');
-          } else {
-            await db.execute({
-              sql: 'UPDATE users SET failed_attempts = ? WHERE username = ?',
-              args: [failedAttempts, credentials.username],
-            });
-            throw new Error('Invalid username or password.');
-          }
-        }
-
-        // Success: Reset failed attempts
-        await db.execute({
-          sql: 'UPDATE users SET failed_attempts = 0, locked_until = NULL WHERE username = ?',
-          args: [credentials.username],
-        });
-
-        return { id: user.username as string, name: user.username as string, email: user.username as string };
       }
-    })
-  ],
+
+      // Success: Reset failed attempts
+      await db.execute({
+        sql: 'UPDATE users SET failed_attempts = 0, locked_until = NULL WHERE username = ?',
+        args: [credentials.username],
+      });
+
+      return { id: user.username as string, name: user.username as string, email: user.username as string };
+    }
+  })
+];
+
+if (process.env.GOOGLE_ID && process.env.GOOGLE_SECRET) {
+  providers.push(GoogleProvider({
+    clientId: process.env.GOOGLE_ID,
+    clientSecret: process.env.GOOGLE_SECRET,
+  }));
+}
+
+if (process.env.GITHUB_ID && process.env.GITHUB_SECRET) {
+  providers.push(GithubProvider({
+    clientId: process.env.GITHUB_ID,
+    clientSecret: process.env.GITHUB_SECRET,
+  }));
+}
+
+export const authOptions = {
+  providers,
   secret: process.env.JWT_SECRET || 'fallback-jwt-secret-key',
   session: {
     strategy: 'jwt' as const,
