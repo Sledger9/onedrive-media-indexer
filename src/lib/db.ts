@@ -66,6 +66,16 @@ export async function initDb(): Promise<void> {
       );
     `);
 
+    // 3. Create Users Table for credentials authentication
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS users (
+        username TEXT PRIMARY KEY,
+        password_hash TEXT,
+        failed_attempts INTEGER DEFAULT 0,
+        locked_until TEXT
+      );
+    `);
+
     // Create unique constraint index
     await db.execute(`CREATE UNIQUE INDEX IF NOT EXISTS idx_user_media ON user_states(user_id, media_id);`);
   } catch (error) {
