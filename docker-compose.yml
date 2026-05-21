@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  # Next.js Frontend App
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: media-indexer-frontend
+    ports:
+      - '3000:3000'
+    environment:
+      - DATABASE_URL=libsql://your-turso-db.turso.io
+      - DATABASE_AUTH_TOKEN=your-turso-auth-token
+      - WORKER_API_URL=http://worker:3001
+      - ADMIN_USERNAME=admin
+      - ADMIN_PASSWORD=admin-password
+      - JWT_SECRET=your-jwt-session-secret-key
+    depends_on:
+      - worker
+
+  # FFmpeg & Rclone Background Media Engine Worker
+  worker:
+    build:
+      context: ./worker
+      dockerfile: Dockerfile
+    container_name: media-indexer-worker
+    ports:
+      - '3001:3001'
+    environment:
+      - DATABASE_URL=libsql://your-turso-db.turso.io
+      - DATABASE_AUTH_TOKEN=your-turso-auth-token
+      - RCLONE_GIST_URL=https://gist.githubusercontent.com/.../raw/rclone.conf
+      - RCLONE_REMOTE_NAME=onedrive
+      - JWT_SECRET=your-jwt-session-secret-key
+    volumes:
+      - worker_tmp:/tmp
+
+volumes:
+  worker_tmp:
