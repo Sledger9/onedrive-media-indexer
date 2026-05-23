@@ -77,9 +77,11 @@ export interface OneDriveItem {
   file?: {
     mimeType: string;
   };
+  deleted?: any;
   lastModifiedDateTime: string;
   parentReference?: {
-    path: string;
+    path?: string;
+    id?: string;
   };
   '@microsoft.graph.downloadUrl'?: string;
 }
