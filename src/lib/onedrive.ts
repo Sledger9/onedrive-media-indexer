@@ -1,14 +1,8 @@
 import { db } from './db';
 
-// Use environment variables if provided, otherwise fallback to rclone's default OneDrive client ID and secret
-let CLIENT_ID = process.env.MICROSOFT_CLIENT_ID || 'b15665d9-eda6-4092-8539-0eec376afd59';
-let CLIENT_SECRET = process.env.MICROSOFT_CLIENT_SECRET || 'qtyfaBBYA403=unZUP40~_#';
-
-// Force the correct secret if they are using the rclone app ID, ignoring any invalid .env values
-if (CLIENT_ID.trim() === 'b15665d9-eda6-4092-8539-0eec376afd59') {
-  CLIENT_ID = 'b15665d9-eda6-4092-8539-0eec376afd59';
-  CLIENT_SECRET = 'qtyfaBBYA403=unZUP40~_#';
-}
+// Completely override ALL environment variables and hardcode rclone's known good credentials
+const CLIENT_ID = 'b15665d9-eda6-4092-8539-0eec376afd59';
+const CLIENT_SECRET = 'qtyfaBBYA403=unZUP40~_#';
 
 const REDIRECT_URI = process.env.NEXT_PUBLIC_APP_URL ? `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/onedrive/callback` : 'http://localhost:3000/api/auth/onedrive/callback';
 
@@ -31,12 +25,7 @@ export async function getOneDriveAccessToken(): Promise<string> {
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
     },
-    body: new URLSearchParams({
-      client_id: CLIENT_ID,
-      client_secret: CLIENT_SECRET,
-      grant_type: 'refresh_token',
-      refresh_token: refreshToken,
-    }),
+    body: `client_id=${encodeURIComponent(CLIENT_ID)}&client_secret=${encodeURIComponent(CLIENT_SECRET)}&grant_type=refresh_token&refresh_token=${encodeURIComponent(refreshToken)}`,
   });
 
   const data = await response.json();
