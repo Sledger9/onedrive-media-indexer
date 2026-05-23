@@ -4,10 +4,11 @@ import { db } from '@/lib/db';
 
 let isScanning = false;
 let scanStatus = 'idle';
-let scannedItems = 0;
+let processedItems = 0;
+let totalItems = 0;
 
 export async function GET(req: NextRequest) {
-  return NextResponse.json({ status: scanStatus, isScanning, scannedItems });
+  return NextResponse.json({ status: scanStatus, isScanning, processedItems, totalItems });
 }
 
 export async function POST(req: NextRequest) {
@@ -16,8 +17,9 @@ export async function POST(req: NextRequest) {
   }
 
   isScanning = true;
-  scanStatus = 'scanning';
-  scannedItems = 0;
+  scanStatus = 'fetching';
+  processedItems = 0;
+  totalItems = 0;
 
   // Run scan asynchronously so the request doesn't timeout
   runScan().catch(err => {
@@ -32,6 +34,8 @@ export async function POST(req: NextRequest) {
 async function runScan() {
   try {
     const allItems = await getAllDriveItems();
+    totalItems = allItems.length;
+    scanStatus = 'saving to database';
     
     // Map item IDs to their names so we can build paths (OneDrive delta gives flat list)
     const idToName: Record<string, string> = {};
@@ -57,6 +61,8 @@ async function runScan() {
 
     // Insert all items in batches
     for (const item of allItems) {
+      processedItems++; // Increment progress bar
+
       if (item.deleted) {
         // Handle deleted items if this is an incremental sync
         await db.execute({ sql: `DELETE FROM media_items WHERE id = ?`, args: [item.id] });
@@ -74,7 +80,6 @@ async function runScan() {
           args: [item.id, parentId, item.name, currentPath],
         });
       } else if (item.file && item.name.match(/\.(mp4|mkv|avi|mov)$/i)) {
-        scannedItems++;
         await db.execute({
           sql: `INSERT INTO media_items (id, parent_id, name, path, is_directory, size, mime_type, updated_at) 
                 VALUES (?, ?, ?, ?, 0, ?, ?, CURRENT_TIMESTAMP) 
