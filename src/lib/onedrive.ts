@@ -3,6 +3,7 @@ import { db } from './db';
 // Completely override ALL environment variables and hardcode rclone's known good credentials
 const CLIENT_ID = 'b15665d9-eda6-4092-8539-0eec376afd59';
 const CLIENT_SECRET = 'qtyfaBBYA403=unZUP40~_#';
+const DRIVE_ID = 'b!pU5jbE08tEOljfeOSI0YEXN8cBbVbRNJkVAf_OmZuvmgn46YKAeEQaXBT1t3871G';
 
 const REDIRECT_URI = process.env.NEXT_PUBLIC_APP_URL ? `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/onedrive/callback` : 'http://localhost:3000/api/auth/onedrive/callback';
 
@@ -48,7 +49,7 @@ export async function getOneDriveAccessToken(): Promise<string> {
 export async function getDirectDownloadUrl(driveItemId: string): Promise<string> {
   const accessToken = await getOneDriveAccessToken();
 
-  const response = await fetch(`https://graph.microsoft.com/v1.0/me/drive/items/${driveItemId}`, {
+  const response = await fetch(`https://graph.microsoft.com/v1.0/drives/${DRIVE_ID}/items/${driveItemId}`, {
     headers: {
       Authorization: `Bearer ${accessToken}`,
     },
@@ -86,7 +87,7 @@ export interface OneDriveItem {
 export async function getDriveItems(folderId: string = 'root'): Promise<OneDriveItem[]> {
   const accessToken = await getOneDriveAccessToken();
   let items: OneDriveItem[] = [];
-  let nextLink = `https://graph.microsoft.com/v1.0/me/drive/items/${folderId}/children?$top=200`;
+  let nextLink = `https://graph.microsoft.com/v1.0/drives/${DRIVE_ID}/items/${folderId}/children?$top=200`;
 
   // Fetch all pages
   while (nextLink) {
@@ -97,7 +98,9 @@ export async function getDriveItems(folderId: string = 'root'): Promise<OneDrive
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to fetch items from OneDrive folder ${folderId}`);
+      const errorText = await response.text();
+      console.error('[ONEDRIVE] Microsoft Graph API Error:', errorText);
+      throw new Error(`Failed to fetch items from OneDrive folder ${folderId}: ${errorText}`);
     }
 
     const data = await response.json();
