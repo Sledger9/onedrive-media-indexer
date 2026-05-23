@@ -14,7 +14,11 @@ export async function GET(req: NextRequest) {
     let args: any[] = [];
 
     if (!parentId || parentId === 'root' || parentId === 'null') {
-      query = 'SELECT * FROM media_items WHERE parent_id IS NULL ORDER BY is_directory DESC, name ASC LIMIT ? OFFSET ?';
+      query = `SELECT * FROM media_items 
+               WHERE parent_id = 'root' 
+                  OR parent_id IS NULL
+                  OR parent_id = (SELECT id FROM media_items WHERE (parent_id = 'root' OR parent_id IS NULL) AND is_directory = 1 LIMIT 1)
+               ORDER BY is_directory DESC, name ASC LIMIT ? OFFSET ?`;
       args = [limit, offset];
     } else {
       query = 'SELECT * FROM media_items WHERE parent_id = ? ORDER BY is_directory DESC, name ASC LIMIT ? OFFSET ?';
