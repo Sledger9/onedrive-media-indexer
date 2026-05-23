@@ -89,13 +89,16 @@ export async function getDriveItems(folderId: string = 'root'): Promise<OneDrive
   let items: OneDriveItem[] = [];
   let nextLink = `https://graph.microsoft.com/v1.0/drives/${DRIVE_ID}/items/${folderId}/children?$top=200`;
 
-  // Fetch all pages
   while (nextLink) {
     const response = await fetch(nextLink, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
+      headers: { Authorization: `Bearer ${accessToken}` },
     });
+
+    if (response.status === 429) {
+      console.log('[ONEDRIVE] Rate limited. Waiting 10 seconds...');
+      await new Promise(r => setTimeout(r, 10000));
+      continue;
+    }
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -105,7 +108,38 @@ export async function getDriveItems(folderId: string = 'root'): Promise<OneDrive
 
     const data = await response.json();
     items = items.concat(data.value);
-    nextLink = data['@odata.nextLink']; // Handle pagination
+    nextLink = data['@odata.nextLink'];
+  }
+
+  return items;
+}
+
+export async function getAllDriveItems(): Promise<OneDriveItem[]> {
+  const accessToken = await getOneDriveAccessToken();
+  let items: OneDriveItem[] = [];
+  let nextLink = `https://graph.microsoft.com/v1.0/drives/${DRIVE_ID}/root/delta`;
+
+  while (nextLink) {
+    const response = await fetch(nextLink, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    if (response.status === 429) {
+      console.log('[ONEDRIVE] Rate limited during delta sync. Waiting 10 seconds...');
+      await new Promise(r => setTimeout(r, 10000));
+      continue;
+    }
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[ONEDRIVE] Delta API Error:', errorText);
+      throw new Error(`Failed to fetch delta items: ${errorText}`);
+    }
+
+    const data = await response.json();
+    items = items.concat(data.value);
+    nextLink = data['@odata.nextLink']; // Next page of results
+    if (!nextLink) break; // Reached the end (data['@odata.deltaLink'] is provided for future syncs but we don't need it right now)
   }
 
   return items;
